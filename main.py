@@ -12,28 +12,61 @@ from kivy.logger import Logger
 from kivy.clock import Clock, mainthread
 from kivy.config import ConfigParser
 from kivy.network.urlrequest import UrlRequest
-
+from kivy.uix.screenmanager import ScreenManager, Screen
 # Phidget specific imports
 from Phidgets.PhidgetException import PhidgetErrorCodes, PhidgetException
 from Phidgets.Events.Events import AttachEventArgs, DetachEventArgs, ErrorEventArgs, OutputChangeEventArgs, TagEventArgs
 from Phidgets.Devices.RFID import RFID, RFIDTagProtocol
 from Phidgets.Phidget import PhidgetLogLevel
 
+from kivy.properties import NumericProperty
+from kivy.lang import Builder
 
-# class UserManager(EventDispatcher):
-#
-#     tag_gained = ObjectProperty()
-#     current_user = StringProperty()
-#
-#     def __init__(self):
-#         super(UserManager, self).__init__()
-#
-#     def on_tag_gained(self, instance, value):
-#         if self.current_user == '':
-#             self.current_user = value  # value being the tag gained?
-#             Logger.info 'did it work?  I got {}'.format(self.current_user)
-#         else:
-#             Logger.info 'New tag gained {}'.format(value)4
+Builder.load_string('''
+#:import random random.random
+#:import SlideTransition kivy.uix.screenmanager.SlideTransition
+#:import SwapTransition kivy.uix.screenmanager.SwapTransition
+#:import WipeTransition kivy.uix.screenmanager.WipeTransition
+#:import FadeTransition kivy.uix.screenmanager.FadeTransition
+#:import RiseInTransition kivy.uix.screenmanager.RiseInTransition
+#:import FallOutTransition kivy.uix.screenmanager.FallOutTransition
+#:import NoTransition kivy.uix.screenmanager.NoTransition
+
+<CustomScreen>:
+    hue: random()
+    current_user: root.current_user
+    canvas:
+        Color:
+            hsv: self.hue, .5, .3
+        Rectangle:
+            size: self.size
+
+    Label:
+        font_size: 42
+        text: root.name
+
+    Button:
+        text: 'Next screen'
+        size_hint: None, None
+        pos_hint: {'right': 1}
+        size: 150, 50
+        on_release: root.manager.current = root.manager.next()
+
+    Button:
+        text: 'Previous screen'
+        size_hint: None, None
+        size: 150, 50
+        on_release: root.manager.current = root.manager.previous()
+
+''')
+
+
+class CustomScreen(Screen):
+    hue = NumericProperty(0)
+    tag = StringProperty()
+
+    def on_tag(self, instance, value):
+        Logger.warning("Screen got a new RFID tag: {}".format(value))
 
 
 class UserManager(EventDispatcher):
@@ -64,6 +97,8 @@ class UserManager(EventDispatcher):
             Logger.warn('User Manager: someone attempted to access the system with an invalid card.')
         else:
             Logger.info('User Manager: the tag [{}] was valid.'.format(value))
+            # self.app.root.current_screen.tag = value
+            self.app.last_gained_tag = self.employee
 
     def validate_card(self, rfid_tag):
         Logger.info('User Manager: validate_card with rfid_tag: {}'.format(rfid_tag))
@@ -105,7 +140,7 @@ class UserManager(EventDispatcher):
             self.employee = args[1]['results'][0]  # get the guts of the result (i.e., the employee record)
         else:
             self.employee = []
-            Logger.debug('User Manager: Invalid response from server: s{}'.format(args[1]))
+            Logger.debug('User Manager: Invalid response from server: {}'.format(args[1]))
 
     def url_request_on_error(self, *args):
         self.request_error = True
@@ -222,6 +257,7 @@ class Reader:
 class PhidgetApp(App):
 
     use_kivy_settings = False
+    last_gained_tag = ObjectProperty()
 
     # start the RFID Reader thread
     rfid = Reader()
@@ -236,9 +272,38 @@ class PhidgetApp(App):
     def build(self):
         config = self.config.read('phidget.ini')
         self.title = 'Hello world'
-        btn1 = Button(text='Push Me')
-        btn1.bind(on_press=self.callback)
-        return btn1
+        # btn1 = Button(text='Push Me')
+        # btn1.bind(on_press=self.callback)
+        # return btn1
+        root = ScreenManager()
+        for x in range(3):
+            root.add_widget(CustomScreen(name='Screen %d' % x))
+        return root
+
+    def on_last_gained_tag(self, instance, value):
+        Logger.info('Last Gained Tag: {}'.format(value['employee_type']))
+        if 1 in value["employee_type"]:   # Operator
+            self.root.current = 'Screen 0'
+        if 2 in value["employee_type"]:   # Supervisor
+            self.root.current = 'Screen 1'
+        if 3 in value["employee_type"]:   # Supervisor
+            self.root.current = 'Screen 2'
+        self.root.current_screen.tag = value["rfid_tag"]
 
 if __name__ == '__main__':
     PhidgetApp().run()
+
+
+'''
+{
+    u'phone_number': u'',
+    u'employee_status': [1],
+    u'sms_email_address':
+    u'sms email goes here',
+    u'notes': u'1st Shift Operator',
+    u'rfid_tag': u'023af76c',
+    u'employee_type': [1],
+    u'email_address': u'email needed for notifications',
+    u'id': 12
+}
+'''
