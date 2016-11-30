@@ -63,7 +63,7 @@ Builder.load_string('''
 
 class CustomScreen(Screen):
     hue = NumericProperty(0)
-    tag = StringProperty()
+    tag = StringProperty(force_dispatch=True)
 
     def on_tag(self, instance, value):
         Logger.warning("Screen got a new RFID tag: {}".format(value))
@@ -74,7 +74,7 @@ class UserManager(EventDispatcher):
 
     # todo: do something based on the current screen, maybe stop a timer? e.g. hold screen
 
-    tag_gained = ObjectProperty()    # rfid tag id e.g., 023af7dd
+    tag_gained = ObjectProperty(force_dispatch=True)    # rfid tag id e.g., 023af7dd
     current_user = StringProperty()  # tag id of currently logged in user.
     waiting_for_logon = BooleanProperty()
     waiting_for_logoff = BooleanProperty()
@@ -257,7 +257,7 @@ class Reader:
 class PhidgetApp(App):
 
     use_kivy_settings = False
-    last_gained_tag = ObjectProperty()
+    last_gained_tag = ObjectProperty(force_dispatch=True)
 
     # start the RFID Reader thread
     rfid = Reader()
@@ -266,15 +266,9 @@ class PhidgetApp(App):
         super(PhidgetApp, self).__init__(*args, **kwargs)
         self.config = ConfigParser()
 
-    def callback(self, instance):
-        Logger.info('The button <%s> is being pressed' % instance.text)
-
     def build(self):
         config = self.config.read('phidget.ini')
-        self.title = 'Hello world'
-        # btn1 = Button(text='Push Me')
-        # btn1.bind(on_press=self.callback)
-        # return btn1
+        self.title = 'Phidget RFID Test'
         root = ScreenManager()
         for x in range(3):
             root.add_widget(CustomScreen(name='Screen %d' % x))
@@ -290,6 +284,7 @@ class PhidgetApp(App):
             self.root.current = 'Screen 2'
         self.root.current_screen.tag = value["rfid_tag"]
 
+
 if __name__ == '__main__':
     PhidgetApp().run()
 
@@ -298,8 +293,7 @@ if __name__ == '__main__':
 {
     u'phone_number': u'',
     u'employee_status': [1],
-    u'sms_email_address':
-    u'sms email goes here',
+    u'sms_email_address': u'sms email goes here',
     u'notes': u'1st Shift Operator',
     u'rfid_tag': u'023af76c',
     u'employee_type': [1],
